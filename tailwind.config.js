@@ -1,0 +1,72 @@
+// tailwind.config.js
+/** @type {import('tailwindcss').Config} */
+module.exports = {
+  content: ["./app/**/*.{js,jsx,ts,tsx}", "./components/**/*.{js,jsx,ts,tsx}"],
+  presets: [require("nativewind/preset")],
+  darkMode: "class",
+  theme: {
+    extend: {
+      colors: {
+        "on-background": "#191c1e",
+        "primary-container": "#006684",
+        "surface-container-high": "#e6e8ea",
+        "secondary-fixed": "#dfe3e7",
+        "background": "#f7f9fb",
+        "error-container": "#ffdad6",
+        "surface-container-highest": "#e0e3e5",
+        "on-secondary": "#ffffff",
+        "surface-tint": "#016684",
+        "outline": "#70787e",
+        "secondary": "#5a5f62",
+        "secondary-fixed-dim": "#c3c7cb",
+        "surface-dim": "#d8dadc",
+        "secondary-container": "#dce0e4",
+        "inverse-primary": "#87d0f2",
+        "tertiary": "#6b3a00",
+        "on-primary": "#ffffff",
+        "primary-fixed-dim": "#87d0f2",
+        "on-secondary-fixed": "#171c1f",
+        "on-surface": "#191c1e",
+        "on-tertiary-fixed": "#2d1600",
+        "on-tertiary": "#ffffff",
+        "primary": "#004d64",
+        "on-primary-fixed": "#001f2a",
+        "on-error": "#ffffff",
+        "on-tertiary-fixed-variant": "#6b3b00",
+        "on-secondary-fixed-variant": "#43474b",
+        "tertiary-fixed-dim": "#ffb876",
+        "on-primary-fixed-variant": "#004d64",
+        "surface": "#f7f9fb",
+        "tertiary-fixed": "#ffdcc0",
+        "surface-variant": "#e0e3e5",
+        "inverse-surface": "#2d3133",
+        "surface-container-lowest": "#ffffff",
+        "tertiary-container": "#885116",
+        "on-error-container": "#93000a",
+        "error": "#ba1a1a",
+        "primary-fixed": "#bee9ff",
+        "on-primary-container": "#a2e1ff",
+        "inverse-on-surface": "#eff1f3",
+        "outline-variant": "#bfc8cd",
+        "surface-bright": "#f7f9fb",
+        "on-tertiary-container": "#ffcfa6",
+        "surface-container-low": "#f2f4f6",
+        "on-surface-variant": "#3f484d",
+        "surface-container": "#eceef0",
+        "on-secondary-container": "#5e6367"
+      },
+      borderRadius: {
+        "DEFAULT": "2px",
+        "lg": "4px",
+        "xl": "8px",
+        "full": "9999px" // using 9999px instead of 0.75rem for perfect circles in React Native
+      },
+      fontFamily: {
+        "headline": ["Manrope"],
+        "body": ["Inter"],
+        "label": ["Inter"]
+      }
+    },
+  },
+  plugins: [],
+}

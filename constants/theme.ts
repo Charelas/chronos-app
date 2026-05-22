@@ -1,53 +1,65 @@
-/**
- * Below are the colors that are used in the app. The colors are defined in the light and dark mode.
- * There are many other ways to style your app. For example, [Nativewind](https://www.nativewind.dev/), [Tamagui](https://tamagui.dev/), [unistyles](https://reactnativeunistyles.vercel.app), etc.
- */
-
-import { Platform } from 'react-native';
-
-const tintColorLight = '#0a7ea4';
-const tintColorDark = '#fff';
+// Design System: "The Balanced Chronograph"
+// Colors from the Material 3 palette
 
 export const Colors = {
-  light: {
-    text: '#11181C',
-    background: '#fff',
-    tint: tintColorLight,
-    icon: '#687076',
-    tabIconDefault: '#687076',
-    tabIconSelected: tintColorLight,
-  },
-  dark: {
-    text: '#ECEDEE',
-    background: '#151718',
-    tint: tintColorDark,
-    icon: '#9BA1A6',
-    tabIconDefault: '#9BA1A6',
-    tabIconSelected: tintColorDark,
-  },
+  primary: '#004d64',
+  primaryContainer: '#006684',
+  onPrimary: '#ffffff',
+  onPrimaryContainer: '#a2e1ff',
+  primaryFixed: '#bee9ff',
+  primaryFixedDim: '#87d0f2',
+
+  secondary: '#5a5f62',
+  secondaryContainer: '#dce0e4',
+  onSecondary: '#ffffff',
+  onSecondaryContainer: '#5e6367',
+  secondaryFixed: '#dfe3e7',
+  secondaryFixedDim: '#c3c7cb',
+
+  tertiary: '#6b3a00',
+  tertiaryContainer: '#885116',
+  onTertiary: '#ffffff',
+  onTertiaryContainer: '#ffcfa6',
+  tertiaryFixed: '#ffdcc0',
+  tertiaryFixedDim: '#ffb876',
+
+  error: '#ba1a1a',
+  errorContainer: '#ffdad6',
+  onError: '#ffffff',
+  onErrorContainer: '#93000a',
+
+  surface: '#f7f9fb',
+  surfaceBright: '#f7f9fb',
+  surfaceDim: '#d8dadc',
+  surfaceContainerLowest: '#ffffff',
+  surfaceContainerLow: '#f2f4f6',
+  surfaceContainer: '#eceef0',
+  surfaceContainerHigh: '#e6e8ea',
+  surfaceContainerHighest: '#e0e3e5',
+  surfaceVariant: '#e0e3e5',
+
+  onSurface: '#191c1e',
+  onSurfaceVariant: '#3f484d',
+  onBackground: '#191c1e',
+  background: '#f7f9fb',
+
+  outline: '#70787e',
+  outlineVariant: '#bfc8cd',
+
+  inverseSurface: '#2d3133',
+  inverseOnSurface: '#eff1f3',
+  inversePrimary: '#87d0f2',
+
+  surfaceTint: '#016684',
 };
 
-export const Fonts = Platform.select({
-  ios: {
-    /** iOS `UIFontDescriptorSystemDesignDefault` */
-    sans: 'system-ui',
-    /** iOS `UIFontDescriptorSystemDesignSerif` */
-    serif: 'ui-serif',
-    /** iOS `UIFontDescriptorSystemDesignRounded` */
-    rounded: 'ui-rounded',
-    /** iOS `UIFontDescriptorSystemDesignMonospaced` */
-    mono: 'ui-monospace',
-  },
-  default: {
-    sans: 'normal',
-    serif: 'serif',
-    rounded: 'normal',
-    mono: 'monospace',
-  },
-  web: {
-    sans: "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
-    serif: "Georgia, 'Times New Roman', serif",
-    rounded: "'SF Pro Rounded', 'Hiragino Maru Gothic ProN', Meiryo, 'MS PGothic', sans-serif",
-    mono: "SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace",
-  },
-});
+export const Fonts = {
+  headline: 'Manrope_700Bold',
+  headlineExtraBold: 'Manrope_800ExtraBold',
+  headlineRegular: 'Manrope_400Regular',
+  body: 'Inter_400Regular',
+  bodyMedium: 'Inter_500Medium',
+  bodySemiBold: 'Inter_600SemiBold',
+  label: 'Inter_500Medium',
+  labelBold: 'Inter_600SemiBold',
+};
