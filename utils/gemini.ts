@@ -2,11 +2,17 @@
  * utils/gemini.ts
  * AI-powered balance insights using Google Gemini API.
  * Falls back to rule-based insights if API key is missing or request fails.
+ *
+ * Cache strategy: insight is cached in-memory for CACHE_TTL_MS (30 min)
+ * and only re-fetched when weeklyHours or totalBalance changes meaningfully (≥0.1h).
+ * This prevents 429 rate-limit errors during normal app usage.
  */
 
 const GEMINI_API_KEY = process.env.EXPO_PUBLIC_GEMINI_API_KEY ?? '';
-const GEMINI_MODEL = 'gemini-2.0-flash';
+const GEMINI_MODEL = 'gemini-2.0-flash-lite'; // lite = higher free-tier RPM
 const GEMINI_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
+
+const CACHE_TTL_MS = 30 * 60 * 1000; // 30 minutes
 
 export type InsightInput = {
   userName: string;
@@ -26,6 +32,27 @@ export type AIInsight = {
   source: 'ai' | 'rule'; // 'ai' = Gemini, 'rule' = fallback
 };
 
+// ---------- In-memory cache ----------
+
+type CacheEntry = {
+  insight: AIInsight;
+  cachedAt: number;
+  weeklyHoursSnapshot: number;
+  totalBalanceSnapshot: number;
+};
+
+let cache: CacheEntry | null = null;
+
+function isCacheValid(input: InsightInput): boolean {
+  if (!cache) return false;
+  const age = Date.now() - cache.cachedAt;
+  if (age > CACHE_TTL_MS) return false;
+  // Invalidate if data changed by more than 0.1h (a meaningful logged session)
+  const hoursChanged = Math.abs(cache.weeklyHoursSnapshot - input.weeklyHours) >= 0.1;
+  const balanceChanged = Math.abs(cache.totalBalanceSnapshot - input.totalBalance) >= 0.1;
+  return !hoursChanged && !balanceChanged;
+}
+
 // ---------- Rule-based fallback ----------
 
 function buildRuleInsight(input: InsightInput): AIInsight {
@@ -43,7 +70,7 @@ function buildRuleInsight(input: InsightInput): AIInsight {
   if (pct >= 1) {
     return {
       headline: 'Weekly Target Achieved',
-      body: `You've hit your ${weeklyCommitment}h weekly target! Your most productive day was ${peakDay} at ${peakDayHours.toFixed(1)}h. Consider scheduling lighter tasks for the rest of the week.`,
+      body: `You've hit your ${weeklyCommitment}h weekly target. Your most productive day was ${peakDay} at ${peakDayHours.toFixed(1)}h. Consider scheduling lighter tasks for the rest of the week.`,
       mood: 'positive',
       source: 'rule',
     };
@@ -119,6 +146,11 @@ export async function getBalanceInsight(input: InsightInput): Promise<AIInsight>
     return buildRuleInsight(input);
   }
 
+  // Return cached result if still valid
+  if (isCacheValid(input)) {
+    return cache!.insight;
+  }
+
   try {
     const response = await fetch(GEMINI_ENDPOINT, {
       method: 'POST',
@@ -141,14 +173,39 @@ export async function getBalanceInsight(input: InsightInput): Promise<AIInsight>
 
     if (!parsed.headline || !parsed.body || !parsed.mood) throw new Error('Invalid Gemini response shape');
 
-    return {
+    const insight: AIInsight = {
       headline: parsed.headline,
       body: parsed.body,
       mood: parsed.mood as AIInsight['mood'],
       source: 'ai',
     };
+
+    // Store in cache
+    cache = {
+      insight,
+      cachedAt: Date.now(),
+      weeklyHoursSnapshot: input.weeklyHours,
+      totalBalanceSnapshot: input.totalBalance,
+    };
+
+    return insight;
   } catch (err) {
     if (__DEV__) console.warn('🤖 [Gemini] Falling back to rule-based insight:', err);
-    return buildRuleInsight(input);
+
+    // Cache the fallback too — prevents hammering the API on repeated 429s
+    const fallback = buildRuleInsight(input);
+    cache = {
+      insight: fallback,
+      cachedAt: Date.now(),
+      weeklyHoursSnapshot: input.weeklyHours,
+      totalBalanceSnapshot: input.totalBalance,
+    };
+
+    return fallback;
   }
+}
+
+/** Call this to force a fresh AI fetch on next analytics open (e.g. after adding an entry) */
+export function invalidateInsightCache(): void {
+  cache = null;
 }

@@ -9,6 +9,7 @@ import {
   computeTotalBalance, getCategoryBalanceSign,
   TimeEntry, TimerState, AppSettings, defaultSettings,
 } from '../utils/storage';
+import { invalidateInsightCache } from '../utils/gemini';
 
 type AppContextType = {
   entries: TimeEntry[];
@@ -112,11 +113,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const newEntry: TimeEntry = { ...entry, id: generateId() };
     const updated = await addEntryToStorage(newEntry);
     setEntries(updated);
+    invalidateInsightCache(); // new entry — force fresh insight next open
   }, []);
 
   const removeEntry = useCallback(async (id: string) => {
     const updated = await deleteEntryFromStorage(id);
     setEntries(updated);
+    invalidateInsightCache(); // data changed — force fresh insight next open
   }, []);
 
   const updateSettings = useCallback(async (partial: Partial<AppSettings>) => {
@@ -159,6 +162,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
     const updated = await addEntryToStorage(entry);
     setEntries(updated);
+    invalidateInsightCache(); // new session logged — force fresh insight next open
 
     const stoppedState: TimerState = { isRunning: false, startedAt: null, currentTask: '', category: 'Work' };
     await saveTimerState(stoppedState);
