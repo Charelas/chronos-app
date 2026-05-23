@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Colors, Fonts } from '../constants/theme';
@@ -18,47 +18,162 @@ type Notification = {
 };
 
 export default function NotificationsScreen() {
-  const { totalBalance, weeklyHours, settings } = useApp();
+  const { totalBalance, weeklyHours, settings, entries, timer } = useApp();
   const router = useRouter();
 
-  const allNotifications: Notification[] = [
-    ...(totalBalance < 0 ? [{
-      id: 'w1', type: 'warning' as const, icon: 'account-balance-wallet',
-      title: 'Weekly Balance Deficit',
-      desc: `Your current time balance is at ${totalBalance.toFixed(1)} hours for the week. Consider logging your sessions to equalize.`,
-      time: 'NOW', actionLabel: 'Log Time', actionRoute: '/(tabs)/add',
-    }] : []),
-    ...(weeklyHours > settings.weeklyCommitment ? [{
-      id: 'w2', type: 'warning' as const, icon: 'timer-off',
-      title: 'Overtime Threshold Reached',
-      desc: `You've exceeded your weekly ${settings.weeklyCommitment}h target. Your "Rest & Recovery" score may be dropping.`,
-      time: 'TODAY', actionLabel: 'Take Break',
-    }] : []),
-    {
-      id: 'r1', type: 'reminder' as const, icon: 'event-repeat',
-      title: 'Team Sync: Project Zenith',
-      desc: 'Starts in 15 minutes. Ensure your daily logs are updated for the export.',
-      time: 'UPCOMING', actionLabel: 'View Details', actionRoute: '/project_details',
-    },
-    {
-      id: 'r2', type: 'reminder' as const, icon: 'history-edu',
+  // ── Compute dynamic data ──────────────────────────────────────────────
+  const todayStr = new Date().toISOString().split('T')[0];
+
+  const { peakDayLabel, peakDayHours, streak, weeklyPct, hasEntryToday } = useMemo(() => {
+    const now = new Date();
+    const weekStart = new Date(now);
+    weekStart.setDate(now.getDate() - now.getDay());
+    weekStart.setHours(0, 0, 0, 0);
+
+    // Per-day hours this week
+    const dayHours: Record<string, number> = {};
+    entries
+      .filter(e => new Date(e.date) >= weekStart)
+      .forEach(e => { dayHours[e.date] = (dayHours[e.date] || 0) + e.durationMinutes / 60; });
+
+    const peakEntry = Object.entries(dayHours).sort((a, b) => b[1] - a[1])[0];
+    const peakDayLabel = peakEntry
+      ? new Date(peakEntry[0]).toLocaleDateString('en-US', { weekday: 'long' })
+      : null;
+    const peakDayHours = peakEntry ? peakEntry[1] : 0;
+
+    // Consecutive-day streak
+    let streak = 0;
+    for (let i = 0; i < 30; i++) {
+      const d = new Date(now);
+      d.setDate(now.getDate() - i);
+      if (entries.some(e => e.date === d.toISOString().split('T')[0])) {
+        streak++;
+      } else if (i > 0) break;
+    }
+
+    const weeklyPct = settings.weeklyCommitment > 0
+      ? Math.round((weeklyHours / settings.weeklyCommitment) * 100)
+      : 0;
+
+    const hasEntryToday = entries.some(e => e.date === todayStr);
+
+    return { peakDayLabel, peakDayHours, streak, weeklyPct, hasEntryToday };
+  }, [entries, settings, weeklyHours, todayStr]);
+
+  // ── Build notification list from state ────────────────────────────────
+  const allNotifications: Notification[] = useMemo(() => {
+    const notifs: Notification[] = [];
+
+    // Active timer reminder
+    if (timer.isRunning) {
+      notifs.push({
+        id: 'live1', type: 'reminder', icon: 'radio-button-checked',
+        title: 'Timer Still Running',
+        desc: `Active session: "${timer.currentTask}". Remember to stop it when you finish.`,
+        time: 'NOW', actionLabel: 'Go to Dashboard', actionRoute: '/(tabs)',
+      });
+    }
+
+    // Balance warnings
+    if (totalBalance < -4) {
+      notifs.push({
+        id: 'w1', type: 'warning', icon: 'account-balance-wallet',
+        title: 'Significant Balance Deficit',
+        desc: `Your balance is at ${totalBalance.toFixed(1)}h. You've been investing heavily in personal time. Log more work sessions to restore equilibrium.`,
+        time: 'NOW', actionLabel: 'Log Time', actionRoute: '/(tabs)/add',
+      });
+    } else if (totalBalance < 0) {
+      notifs.push({
+        id: 'w1b', type: 'warning', icon: 'trending-down',
+        title: 'Balance Slightly Negative',
+        desc: `Current balance: ${totalBalance.toFixed(1)}h. A small deficit is normal — your next session will bring it back.`,
+        time: 'TODAY', actionLabel: 'Add Entry', actionRoute: '/(tabs)/add',
+      });
+    }
+
+    // Overtime
+    if (weeklyHours > settings.weeklyCommitment) {
+      notifs.push({
+        id: 'w2', type: 'warning', icon: 'timer-off',
+        title: 'Overtime Threshold Reached',
+        desc: `You've exceeded your ${settings.weeklyCommitment}h weekly target by ${(weeklyHours - settings.weeklyCommitment).toFixed(1)}h. Consider scheduling lighter tasks.`,
+        time: 'TODAY',
+      });
+    }
+
+    // Idle alert
+    if (!hasEntryToday && !timer.isRunning && entries.length > 0) {
+      notifs.push({
+        id: 'r0', type: 'reminder', icon: 'hourglass-empty',
+        title: 'No Sessions Logged Today',
+        desc: "You haven't tracked any time yet today. Start a timer or add a manual entry to keep your balance accurate.",
+        time: 'TODAY', actionLabel: 'Start Timer', actionRoute: '/(tabs)',
+      });
+    }
+
+    // Weekly goal progress
+    if (weeklyPct >= 100) {
+      notifs.push({
+        id: 'r1a', type: 'reminder', icon: 'check-circle',
+        title: 'Weekly Target Achieved',
+        desc: `You've hit ${weeklyPct}% of your ${settings.weeklyCommitment}h weekly goal. Balance is looking great — well done.`,
+        time: 'THIS WEEK', actionLabel: 'View Analytics', actionRoute: '/analytics',
+      });
+    } else if (weeklyPct >= 75) {
+      notifs.push({
+        id: 'r1b', type: 'reminder', icon: 'flag',
+        title: 'Almost at Weekly Goal',
+        desc: `You're ${weeklyPct}% through your ${settings.weeklyCommitment}h commitment. ${(settings.weeklyCommitment - weeklyHours).toFixed(1)}h to go!`,
+        time: 'THIS WEEK', actionLabel: 'View Progress', actionRoute: '/analytics',
+      });
+    }
+
+    // Peak day insight
+    if (peakDayLabel && peakDayHours > 0) {
+      notifs.push({
+        id: 'r2', type: 'reminder', icon: 'trending-up',
+        title: `Peak Day: ${peakDayLabel}`,
+        desc: `Most productive day this week was ${peakDayLabel} with ${peakDayHours.toFixed(1)}h logged. Schedule high-complexity tasks during this window.`,
+        time: 'THIS WEEK', actionLabel: 'View Details', actionRoute: '/project_details',
+      });
+    }
+
+    // Streak milestone
+    if (streak >= 3) {
+      notifs.push({
+        id: 'r3', type: 'reminder', icon: 'local-fire-department',
+        title: `${streak}-Day Tracking Streak`,
+        desc: `You've logged time for ${streak} consecutive days. Consistent tracking leads to better balance awareness.`,
+        time: `${streak}D STREAK`,
+      });
+    }
+
+    // Monthly timesheet reminder
+    notifs.push({
+      id: 'r4', type: 'reminder', icon: 'history-edu',
       title: 'Monthly Timesheet Review',
-      desc: 'Your balance summary requires review. Check your analytics for the full breakdown.',
-      time: 'DUE SOON', actionLabel: 'Review', actionRoute: '/analytics',
-    },
-    {
-      id: 's1', type: 'system' as const, icon: 'code',
-      title: 'V2.4 Architecture Patch',
-      desc: 'Enhanced the "Teams" visualization engine. Smoother transitions.',
-      time: '3D AGO',
-    },
-    {
-      id: 's2', type: 'system' as const, icon: 'security',
-      title: 'Privacy Policy Update',
-      desc: "We've clarified how team-level data is anonymized.",
+      desc: 'Check your analytics for a full breakdown of this month\'s time allocation and balance status.',
+      time: 'MONTHLY', actionLabel: 'Review', actionRoute: '/analytics',
+    });
+
+    // System notifications
+    notifs.push({
+      id: 's1', type: 'system', icon: 'auto-awesome',
+      title: 'AI Insights Available',
+      desc: 'The Balance Report now includes AI-powered insights that analyse your productivity patterns and generate personalised recommendations.',
+      time: 'NEW', actionLabel: 'Try It', actionRoute: '/analytics',
+    });
+
+    notifs.push({
+      id: 's2', type: 'system', icon: 'security',
+      title: 'Your Data Stays Private',
+      desc: 'All time entries are stored locally on your device. Nothing is sent to external servers.',
       time: '1W AGO',
-    },
-  ];
+    });
+
+    return notifs;
+  }, [totalBalance, weeklyHours, settings, timer, hasEntryToday, weeklyPct, peakDayLabel, peakDayHours, streak, entries]);
 
   const [dismissed, setDismissed] = useState<string[]>([]);
   const [activeFilter, setActiveFilter] = useState<'all' | 'warning' | 'reminder' | 'system'>('all');
@@ -97,7 +212,7 @@ export default function NotificationsScreen() {
       </View>
 
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-        {/* Categories */}
+        {/* ── Filter categories ── */}
         <View style={styles.categoriesCard}>
           <Text style={styles.catLabel}>CATEGORIES</Text>
           {([
@@ -124,7 +239,7 @@ export default function NotificationsScreen() {
           ))}
         </View>
 
-        {/* Notifications */}
+        {/* ── Notification cards ── */}
         {visibleNotifications.length === 0 ? (
           <View style={styles.emptyState}>
             <MaterialIcons name="notifications-none" size={40} color={Colors.outlineVariant} />
