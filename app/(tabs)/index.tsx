@@ -1,5 +1,5 @@
-import React, { useState, useMemo } from 'react';
-import { View, Text, ScrollView, Image, TouchableOpacity, StyleSheet, Alert, TextInput, Modal } from 'react-native';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
+import { View, Text, ScrollView, Image, TouchableOpacity, StyleSheet, Alert, TextInput, Modal, Animated, Easing } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Colors, Fonts } from '../../constants/theme';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -13,6 +13,58 @@ export default function DashboardScreen() {
   const [showTimerModal, setShowTimerModal] = useState(false);
   const [taskName, setTaskName] = useState('');
   const [taskCategory, setTaskCategory] = useState('Work');
+
+  // ── Animated balance counter ─────────────────────────────────────────
+  const animatedBalance = useRef(new Animated.Value(totalBalance)).current;
+  const prevBalance = useRef(totalBalance);
+  const [displayBalance, setDisplayBalance] = useState(totalBalance);
+  const [displaySign, setDisplaySign] = useState(totalBalance >= 0 ? '+' : '');
+
+  // Sync listener → state (drives the displayed number during animation)
+  useEffect(() => {
+    const listenerId = animatedBalance.addListener(({ value }) => {
+      setDisplayBalance(value);
+    });
+    return () => animatedBalance.removeListener(listenerId);
+  }, []);
+
+  useEffect(() => {
+    const from = prevBalance.current;
+    const to = totalBalance;
+    if (Math.abs(from - to) < 0.001) return; // no meaningful change
+
+    // Set sign early when going positive (feels more responsive)
+    if (to >= 0) setDisplaySign('+');
+
+    animatedBalance.setValue(from);
+    Animated.timing(animatedBalance, {
+      toValue: to,
+      duration: 900,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: false,
+    }).start(() => {
+      setDisplaySign(to >= 0 ? '+' : '');
+      setDisplayBalance(to);
+      prevBalance.current = to;
+    });
+  }, [totalBalance]);
+
+  // ── Pulse animation on the active timer dot ──────────────────────────
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+  useEffect(() => {
+    if (!timer.isRunning) {
+      pulseAnim.setValue(1);
+      return;
+    }
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, { toValue: 1.6, duration: 700, useNativeDriver: true, easing: Easing.inOut(Easing.ease) }),
+        Animated.timing(pulseAnim, { toValue: 1, duration: 700, useNativeDriver: true, easing: Easing.inOut(Easing.ease) }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [timer.isRunning]);
 
   const formatElapsed = (s: number) => {
     const h = Math.floor(s / 3600);
@@ -107,7 +159,19 @@ export default function DashboardScreen() {
         <View style={styles.heroCard}>
           <Text style={styles.heroLabel}>AVAILABLE TIME CREDIT</Text>
           <View style={styles.heroRow}>
-            <Text style={styles.heroNumber}>{totalBalance >= 0 ? '+' : ''}{totalBalance.toFixed(1)}</Text>
+            <View style={styles.heroNumberWrap}>
+              <Text style={[styles.heroSign, displayBalance < 0 && { color: Colors.error }]}>
+                {displayBalance >= 0 ? '+' : '−'}
+              </Text>
+              <Text
+                style={[
+                  styles.heroNumber,
+                  displayBalance < 0 && { color: Colors.error },
+                ]}
+              >
+                {Math.abs(displayBalance).toFixed(1)}
+              </Text>
+            </View>
             <Text style={styles.heroUnit}>HOURS</Text>
           </View>
           <Text style={styles.heroDescription}>
@@ -178,7 +242,7 @@ export default function DashboardScreen() {
         {timer.isRunning && (
           <View style={styles.focusCard}>
             <View style={styles.focusLeft}>
-              <View style={styles.pulseDot} />
+              <Animated.View style={[styles.pulseDot, { transform: [{ scale: pulseAnim }] }]} />
               <View>
                 <Text style={styles.focusLabel}>CURRENT FOCUS</Text>
                 <Text style={styles.focusTitle} numberOfLines={1}>{timer.currentTask}</Text>
@@ -310,9 +374,11 @@ const styles = StyleSheet.create({
   scrollView: { flex: 1, paddingHorizontal: 20 },
   heroCard: { backgroundColor: Colors.surfaceContainerLowest, borderRadius: 16, padding: 28, marginTop: 16, borderWidth: 0.5, borderColor: Colors.outlineVariant + '25' },
   heroLabel: { fontFamily: Fonts.labelBold, fontSize: 10, letterSpacing: 1.5, color: Colors.onSurfaceVariant },
-  heroRow: { flexDirection: 'row', alignItems: 'baseline', marginTop: 12, gap: 8 },
+  heroRow: { flexDirection: 'row', alignItems: 'center', marginTop: 12, gap: 10 },
+  heroNumberWrap: { flexDirection: 'row', alignItems: 'baseline' },
+  heroSign: { fontFamily: Fonts.headlineExtraBold, fontSize: 36, color: Colors.primary, letterSpacing: -1, lineHeight: 76, marginRight: 2 },
   heroNumber: { fontFamily: Fonts.headlineExtraBold, fontSize: 72, color: Colors.primary, letterSpacing: -3, lineHeight: 76 },
-  heroUnit: { fontFamily: Fonts.headline, fontSize: 20, color: Colors.secondary },
+  heroUnit: { fontFamily: Fonts.headline, fontSize: 20, color: Colors.secondary, alignSelf: 'flex-end', marginBottom: 8 },
   heroDescription: { fontFamily: Fonts.body, fontSize: 14, color: Colors.onSurfaceVariant, lineHeight: 22, marginTop: 12, maxWidth: 300 },
   actionsRow: { flexDirection: 'row', gap: 12, marginTop: 16 },
   primaryAction: { flex: 1, backgroundColor: Colors.primary, borderRadius: 16, padding: 20, justifyContent: 'space-between', minHeight: 140 },
