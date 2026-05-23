@@ -23,8 +23,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const GEMINI_API_KEY = process.env.EXPO_PUBLIC_GEMINI_API_KEY ?? '';
 
-// gemini-1.5-flash: stabil, gratis, JSON mode supported, RPM lebih tinggi dari 2.0-flash
-const GEMINI_MODEL = 'gemini-1.5-flash';
+// gemini-2.5-flash: confirmed working, free tier, best reasoning quality
+const GEMINI_MODEL = 'gemini-2.5-flash';
 const GEMINI_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
 
 const CACHE_KEY = '@chronos_ai_insight_cache';
