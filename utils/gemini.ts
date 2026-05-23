@@ -1,18 +1,34 @@
 /**
  * utils/gemini.ts
- * AI-powered balance insights using Google Gemini API.
- * Falls back to rule-based insights if API key is missing or request fails.
  *
- * Cache strategy: insight is cached in-memory for CACHE_TTL_MS (30 min)
- * and only re-fetched when weeklyHours or totalBalance changes meaningfully (≥0.1h).
- * This prevents 429 rate-limit errors during normal app usage.
+ * Apa yang dilakukan AI di sini?
+ * ─────────────────────────────
+ * Setiap minggu, AI membaca data produktivitas user (jam kerja, balance, hari paling produktif,
+ * kategori dominan, tren vs minggu lalu) dan menghasilkan satu "Balance Insight" — kalimat
+ * singkat yang personal, tenang, dan actionable, seperti seorang productivity coach.
+ *
+ * Contoh output: "You're 87% through your 40h target with a +2.3h surplus.
+ * Wednesday was your sharpest day — consider anchoring deep work there next week."
+ *
+ * Jika API gagal (tidak ada key, offline, rate limit), fungsi ini otomatis fallback ke
+ * rule-based engine yang menghasilkan insight berdasarkan kondisi data — selalu berfungsi.
+ *
+ * Cache strategy:
+ * - Disimpan ke AsyncStorage (bertahan meski app restart / Expo reload)
+ * - TTL: 2 jam
+ * - Invalidated kalau weeklyHours atau totalBalance berubah ≥ 0.1h
  */
 
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
 const GEMINI_API_KEY = process.env.EXPO_PUBLIC_GEMINI_API_KEY ?? '';
-const GEMINI_MODEL = 'gemini-2.0-flash-lite'; // lite = higher free-tier RPM
+
+// gemini-1.5-flash: stabil, gratis, JSON mode supported, RPM lebih tinggi dari 2.0-flash
+const GEMINI_MODEL = 'gemini-1.5-flash';
 const GEMINI_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
 
-const CACHE_TTL_MS = 30 * 60 * 1000; // 30 minutes
+const CACHE_KEY = '@chronos_ai_insight_cache';
+const CACHE_TTL_MS = 2 * 60 * 60 * 1000; // 2 jam — tidak perlu fetch ulang kecuali data berubah
 
 export type InsightInput = {
   userName: string;
@@ -26,34 +42,53 @@ export type InsightInput = {
 };
 
 export type AIInsight = {
-  headline: string;   // short punchy title, e.g. "Peak Performance Wednesday"
-  body: string;       // 1-2 sentence actionable insight
-  mood: 'positive' | 'neutral' | 'warning'; // drives card color
-  source: 'ai' | 'rule'; // 'ai' = Gemini, 'rule' = fallback
+  headline: string;
+  body: string;
+  mood: 'positive' | 'neutral' | 'warning';
+  source: 'ai' | 'rule';
 };
 
-// ---------- In-memory cache ----------
-
-type CacheEntry = {
+type CachePayload = {
   insight: AIInsight;
   cachedAt: number;
   weeklyHoursSnapshot: number;
   totalBalanceSnapshot: number;
 };
 
-let cache: CacheEntry | null = null;
+// ─── AsyncStorage cache helpers ───────────────────────────────────────────────
 
-function isCacheValid(input: InsightInput): boolean {
-  if (!cache) return false;
-  const age = Date.now() - cache.cachedAt;
-  if (age > CACHE_TTL_MS) return false;
-  // Invalidate if data changed by more than 0.1h (a meaningful logged session)
-  const hoursChanged = Math.abs(cache.weeklyHoursSnapshot - input.weeklyHours) >= 0.1;
-  const balanceChanged = Math.abs(cache.totalBalanceSnapshot - input.totalBalance) >= 0.1;
-  return !hoursChanged && !balanceChanged;
+async function loadCache(): Promise<CachePayload | null> {
+  try {
+    const raw = await AsyncStorage.getItem(CACHE_KEY);
+    return raw ? (JSON.parse(raw) as CachePayload) : null;
+  } catch {
+    return null;
+  }
 }
 
-// ---------- Rule-based fallback ----------
+async function saveCache(payload: CachePayload): Promise<void> {
+  try {
+    await AsyncStorage.setItem(CACHE_KEY, JSON.stringify(payload));
+  } catch {
+    // silently ignore storage errors
+  }
+}
+
+async function isCacheValid(input: InsightInput): Promise<CachePayload | null> {
+  const cached = await loadCache();
+  if (!cached) return null;
+
+  const age = Date.now() - cached.cachedAt;
+  if (age > CACHE_TTL_MS) return null;
+
+  const hoursChanged = Math.abs(cached.weeklyHoursSnapshot - input.weeklyHours) >= 0.1;
+  const balanceChanged = Math.abs(cached.totalBalanceSnapshot - input.totalBalance) >= 0.1;
+  if (hoursChanged || balanceChanged) return null;
+
+  return cached;
+}
+
+// ─── Rule-based fallback ──────────────────────────────────────────────────────
 
 function buildRuleInsight(input: InsightInput): AIInsight {
   const { weeklyHours, weeklyCommitment, totalBalance, peakDay, peakDayHours } = input;
@@ -99,7 +134,7 @@ function buildRuleInsight(input: InsightInput): AIInsight {
   };
 }
 
-// ---------- Gemini prompt builder ----------
+// ─── Prompt builder ───────────────────────────────────────────────────────────
 
 function buildPrompt(input: InsightInput): string {
   const {
@@ -113,7 +148,8 @@ function buildPrompt(input: InsightInput): string {
       : `${Math.round(((prevWeekHours - weeklyHours) / prevWeekHours) * 100)}% less`
     : 'no comparison data';
 
-  return `You are a calm, intelligent productivity coach for a mobile time-tracking app called "Chronos Balance." 
+  // Note: NO responseMimeType used — we ask Gemini to return JSON in the prompt itself
+  return `You are a calm, intelligent productivity coach for a mobile time-tracking app called "Chronos Balance."
 The app philosophy is "The Balanced Chronograph" — architectural calm, not aggressive productivity.
 
 User data this week:
@@ -124,31 +160,26 @@ User data this week:
 - Most common category: ${topCategory}
 - Compared to last week: ${trend} hours
 
-Generate a JSON object with exactly these fields:
-{
-  "headline": "3-5 word punchy title (no quotes, no emoji)",
-  "body": "1-2 sentences. Personal, calm, actionable. Reference specific numbers. Do not use exclamation marks.",
-  "mood": "positive" or "neutral" or "warning"
+Respond with ONLY a JSON object — no markdown fences, no explanation, just raw JSON:
+{"headline":"3-5 word title","body":"1-2 sentences, personal and calm, reference specific numbers, no exclamation marks","mood":"positive"}
+
+mood must be exactly one of: "positive", "neutral", "warning"
+- "warning" if balance < -4h or weekly hours > 60h
+- "positive" if on track or exceeding target
+- "neutral" otherwise`;
 }
 
-Rules:
-- mood is "warning" only if balance < -4h or hours are dangerously high (>60h/week)
-- mood is "positive" if on track or exceeding target
-- mood is "neutral" otherwise
-- Respond ONLY with the JSON object, no markdown, no explanation.`;
-}
-
-// ---------- Main export ----------
+// ─── Main export ──────────────────────────────────────────────────────────────
 
 export async function getBalanceInsight(input: InsightInput): Promise<AIInsight> {
-  // No API key → use rule-based immediately
   if (!GEMINI_API_KEY) {
     return buildRuleInsight(input);
   }
 
-  // Return cached result if still valid
-  if (isCacheValid(input)) {
-    return cache!.insight;
+  // Return cached insight if still valid
+  const cached = await isCacheValid(input);
+  if (cached) {
+    return cached.insight;
   }
 
   try {
@@ -160,18 +191,26 @@ export async function getBalanceInsight(input: InsightInput): Promise<AIInsight>
         generationConfig: {
           temperature: 0.7,
           maxOutputTokens: 200,
-          responseMimeType: 'application/json',
+          // No responseMimeType — not supported by all models, causes 400
         },
       }),
     });
 
-    if (!response.ok) throw new Error(`Gemini API ${response.status}`);
+    if (!response.ok) {
+      const errBody = await response.text().catch(() => '');
+      throw new Error(`Gemini API ${response.status}: ${errBody.slice(0, 120)}`);
+    }
 
     const data = await response.json();
-    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
-    const parsed = JSON.parse(text);
+    const rawText: string = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
 
-    if (!parsed.headline || !parsed.body || !parsed.mood) throw new Error('Invalid Gemini response shape');
+    // Strip possible markdown code fences before parsing
+    const cleaned = rawText.replace(/```json\n?|\n?```/g, '').trim();
+    const parsed = JSON.parse(cleaned);
+
+    if (!parsed.headline || !parsed.body || !parsed.mood) {
+      throw new Error('Invalid Gemini response shape');
+    }
 
     const insight: AIInsight = {
       headline: parsed.headline,
@@ -180,32 +219,39 @@ export async function getBalanceInsight(input: InsightInput): Promise<AIInsight>
       source: 'ai',
     };
 
-    // Store in cache
-    cache = {
+    await saveCache({
       insight,
       cachedAt: Date.now(),
       weeklyHoursSnapshot: input.weeklyHours,
       totalBalanceSnapshot: input.totalBalance,
-    };
+    });
 
     return insight;
   } catch (err) {
     if (__DEV__) console.warn('🤖 [Gemini] Falling back to rule-based insight:', err);
 
-    // Cache the fallback too — prevents hammering the API on repeated 429s
     const fallback = buildRuleInsight(input);
-    cache = {
+    // Cache fallback with shorter TTL (30 min) so it retries sooner
+    await saveCache({
       insight: fallback,
-      cachedAt: Date.now(),
+      cachedAt: Date.now() - (CACHE_TTL_MS - 30 * 60 * 1000),
       weeklyHoursSnapshot: input.weeklyHours,
       totalBalanceSnapshot: input.totalBalance,
-    };
+    });
 
     return fallback;
   }
 }
 
-/** Call this to force a fresh AI fetch on next analytics open (e.g. after adding an entry) */
-export function invalidateInsightCache(): void {
-  cache = null;
+/**
+ * Invalidate the persisted insight cache.
+ * Call after any data change (add/delete entry, stop timer) so the next
+ * Analytics visit fetches a fresh AI insight.
+ */
+export async function invalidateInsightCache(): Promise<void> {
+  try {
+    await AsyncStorage.removeItem(CACHE_KEY);
+  } catch {
+    // silently ignore
+  }
 }
