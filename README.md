@@ -210,7 +210,7 @@ MIT © 2026 [Charelas](https://github.com/Charelas)
 
 <div align="center">
 
-**CHRONOS BALANCE · V. 1.0.0 · EST. 2024**
+**CHRONOS BALANCE · V. 1.0.0 · EST. 2026**
 
 *Architecture / Precision / Balance*
 
