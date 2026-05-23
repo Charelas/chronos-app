@@ -81,7 +81,18 @@ export default function DashboardScreen() {
           <TouchableOpacity onPress={() => router.push('/analytics')}>
             <MaterialIcons name="bar-chart" size={24} color={Colors.primary} />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Balanced Chronograph</Text>
+          <View>
+            {settings.userName ? (
+              <>
+                <Text style={styles.headerGreeting}>
+                  {new Date().getHours() < 12 ? 'Good morning' : new Date().getHours() < 17 ? 'Good afternoon' : 'Good evening'}
+                </Text>
+                <Text style={styles.headerTitle}>{settings.userName}</Text>
+              </>
+            ) : (
+              <Text style={styles.headerTitle}>Balanced Chronograph</Text>
+            )}
+          </View>
         </View>
         <TouchableOpacity style={styles.avatar} onPress={() => router.push('/team_balance')}>
           <Image
@@ -292,7 +303,8 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.surface },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, height: 56, backgroundColor: Colors.surfaceContainerLowest },
   headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  headerTitle: { fontFamily: Fonts.headlineExtraBold, fontSize: 18, color: Colors.primary, letterSpacing: -0.3 },
+  headerGreeting: { fontFamily: Fonts.body, fontSize: 10, letterSpacing: 0.5, color: Colors.onSurfaceVariant },
+  headerTitle: { fontFamily: Fonts.headlineExtraBold, fontSize: 16, color: Colors.primary, letterSpacing: -0.3 },
   avatar: { width: 36, height: 36, borderRadius: 18, overflow: 'hidden', backgroundColor: Colors.surfaceContainerHigh },
   avatarImg: { width: '100%', height: '100%' },
   scrollView: { flex: 1, paddingHorizontal: 20 },

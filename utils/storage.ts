@@ -7,6 +7,7 @@ const KEYS = {
   SETTINGS: '@chronos_settings',
   TIMER: '@chronos_timer',
   ONBOARDED: '@chronos_onboarded',
+  USER_NAME: '@chronos_user_name',
 };
 
 // ---------- Types ----------
@@ -38,6 +39,7 @@ export type AppSettings = {
   darkMode: boolean;
   dailySummary: boolean;
   idleAlerts: boolean;
+  userName: string;
 };
 
 export const defaultSettings: AppSettings = {
@@ -49,6 +51,7 @@ export const defaultSettings: AppSettings = {
   darkMode: false,
   dailySummary: true,
   idleAlerts: true,
+  userName: '',
 };
 
 // ---------- Entry CRUD ----------

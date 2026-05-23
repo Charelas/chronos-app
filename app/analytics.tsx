@@ -1,14 +1,17 @@
-import React, { useMemo } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, DimensionValue } from 'react-native';
+import React, { useMemo, useEffect, useState } from 'react';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, DimensionValue, ActivityIndicator } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Colors, Fonts } from '../constants/theme';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useApp } from '../context/AppContext';
 import { useRouter } from 'expo-router';
+import { getBalanceInsight, AIInsight } from '../utils/gemini';
 
 export default function AnalyticsScreen() {
   const { entries, settings, weeklyHours, totalBalance } = useApp();
   const router = useRouter();
+  const [aiInsight, setAiInsight] = useState<AIInsight | null>(null);
+  const [insightLoading, setInsightLoading] = useState(true);
 
   const weekData = useMemo(() => {
     const now = new Date();
@@ -74,6 +77,36 @@ export default function AnalyticsScreen() {
   // Find peak day
   const peakDay = weekData.dayData.reduce((best, d) => d.current > best.current ? d : best, weekData.dayData[0]);
 
+  // Top category by hours
+  const topCategory = weekData.allocation.length > 0
+    ? weekData.allocation.reduce((a, b) => a.hours > b.hours ? a : b).label
+    : 'Work';
+
+  // Previous week hours (sum of prev in dayData)
+  const prevWeekHours = weekData.dayData.reduce((sum, d) => sum + d.prev, 0);
+
+  // Fetch AI insight whenever weekly data changes
+  useEffect(() => {
+    let cancelled = false;
+    setInsightLoading(true);
+    getBalanceInsight({
+      userName: settings.userName,
+      weeklyHours,
+      weeklyCommitment: settings.weeklyCommitment,
+      totalBalance,
+      peakDay: peakDay?.day ?? 'N/A',
+      peakDayHours: peakDay?.current ?? 0,
+      topCategory,
+      prevWeekHours,
+    }).then((insight) => {
+      if (!cancelled) {
+        setAiInsight(insight);
+        setInsightLoading(false);
+      }
+    });
+    return () => { cancelled = true; };
+  }, [weeklyHours, totalBalance, settings.userName]);
+
   const formatHours = (h: number) => {
     const hrs = Math.floor(h);
     const mins = Math.round((h - hrs) * 60);
@@ -96,6 +129,37 @@ export default function AnalyticsScreen() {
         <View style={styles.chipRow}>
           <View style={styles.chip}><Text style={styles.chipText}>This Week</Text></View>
         </View>
+
+        {/* ── AI Balance Insight ── */}
+        {insightLoading ? (
+          <View style={styles.aiCardLoading}>
+            <ActivityIndicator size="small" color={Colors.primary} />
+            <Text style={styles.aiLoadingText}>Analysing your balance pattern...</Text>
+          </View>
+        ) : aiInsight ? (
+          <View style={[
+            styles.aiCard,
+            aiInsight.mood === 'positive' && styles.aiCardPositive,
+            aiInsight.mood === 'warning' && styles.aiCardWarning,
+            aiInsight.mood === 'neutral' && styles.aiCardNeutral,
+          ]}>
+            <View style={styles.aiCardHeader}>
+              <View style={styles.aiBadge}>
+                <MaterialIcons name="auto-awesome" size={11} color={Colors.onPrimary} />
+                <Text style={styles.aiBadgeText}>{aiInsight.source === 'ai' ? 'AI INSIGHT' : 'INSIGHT'}</Text>
+              </View>
+              <MaterialIcons
+                name={aiInsight.mood === 'warning' ? 'warning-amber' : aiInsight.mood === 'positive' ? 'trending-up' : 'insights'}
+                size={20}
+                color={aiInsight.mood === 'warning' ? Colors.error : Colors.primary}
+              />
+            </View>
+            <Text style={[styles.aiHeadline, aiInsight.mood === 'warning' && { color: Colors.error }]}>
+              {aiInsight.headline}
+            </Text>
+            <Text style={styles.aiBody}>{aiInsight.body}</Text>
+          </View>
+        ) : null}
 
         {/* Productivity Score */}
         <View style={styles.card}>
@@ -250,4 +314,16 @@ const styles = StyleSheet.create({
   insightDesc: { fontFamily: Fonts.body, fontSize: 13, color: Colors.onSurfaceVariant, lineHeight: 20, marginTop: 8 },
   insightLink: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 14 },
   insightLinkText: { fontFamily: Fonts.labelBold, fontSize: 11, letterSpacing: 1.5, color: Colors.primary },
+  // AI Insight card
+  aiCardLoading: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: Colors.surfaceContainerLow, borderRadius: 14, padding: 16, marginTop: 16 },
+  aiLoadingText: { fontFamily: Fonts.body, fontSize: 13, color: Colors.onSurfaceVariant },
+  aiCard: { borderRadius: 16, padding: 20, marginTop: 16, borderWidth: 0.5 },
+  aiCardPositive: { backgroundColor: Colors.primaryFixed + '28', borderColor: Colors.primaryFixed + '60' },
+  aiCardNeutral: { backgroundColor: Colors.surfaceContainerHigh, borderColor: Colors.outlineVariant + '40' },
+  aiCardWarning: { backgroundColor: Colors.errorContainer + '55', borderColor: Colors.error + '30' },
+  aiCardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
+  aiBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: Colors.primary, borderRadius: 50, paddingHorizontal: 10, paddingVertical: 4 },
+  aiBadgeText: { fontFamily: Fonts.labelBold, fontSize: 9, letterSpacing: 1.5, color: Colors.onPrimary },
+  aiHeadline: { fontFamily: Fonts.headlineExtraBold, fontSize: 18, color: Colors.onSurface, letterSpacing: -0.5, marginBottom: 6 },
+  aiBody: { fontFamily: Fonts.body, fontSize: 14, color: Colors.onSurfaceVariant, lineHeight: 22 },
 });

@@ -86,10 +86,10 @@ export default function SettingsScreen() {
               <MaterialIcons name="edit" size={14} color={Colors.onPrimary} />
             </TouchableOpacity>
           </View>
-          <Text style={styles.profileRole}>ACCOUNT EXECUTIVE</Text>
-          <Text style={styles.profileName}>Julian Sterling</Text>
+          <Text style={styles.profileRole}>CHRONOS BALANCE USER</Text>
+          <Text style={styles.profileName}>{settings.userName || 'My Profile'}</Text>
           <Text style={styles.profileBio}>
-            Optimizing daily productivity through precise temporal balancing since March 2023.
+            Optimizing daily productivity through precise temporal balancing and intentional work-life equilibrium.
           </Text>
           <View style={styles.statsRow}>
             <View style={styles.statItem}>
