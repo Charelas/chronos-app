@@ -8,6 +8,7 @@ const KEYS = {
   TIMER: '@chronos_timer',
   ONBOARDED: '@chronos_onboarded',
   USER_NAME: '@chronos_user_name',
+  CHRONICLES: '@chronos_chronicles',
 };
 
 // ---------- Types ----------
@@ -53,6 +54,59 @@ export const defaultSettings: AppSettings = {
   idleAlerts: true,
   userName: '',
 };
+
+// ---------- Weekly Chronicle ----------
+
+export type WeeklyChronicle = {
+  weekId: string;     // e.g. "2026-W21"
+  weekLabel: string;  // e.g. "May 19 – 25, 2026"
+  narrative: string;  // AI or rule-based editorial paragraph
+  generatedAt: string;
+  stats: {
+    totalHours: number;
+    activeDays: number;
+    totalEntries: number;
+    peakDay: string;
+    peakDayHours: number;
+    finalBalance: number;
+    topCategory: string;
+    weeklyTarget: number;
+  };
+  source: 'ai' | 'rule';
+};
+
+export function getWeekId(date: Date = new Date()): string {
+  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  const dayNum = d.getUTCDay() || 7;
+  d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  const weekNum = Math.ceil(((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
+  return `${d.getUTCFullYear()}-W${weekNum.toString().padStart(2, '0')}`;
+}
+
+export function getWeekLabel(date: Date = new Date()): string {
+  const start = new Date(date);
+  start.setDate(date.getDate() - date.getDay());
+  const end = new Date(start);
+  end.setDate(start.getDate() + 6);
+  const fmt = (d: Date) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  return `${fmt(start)} – ${fmt(end)}, ${date.getFullYear()}`;
+}
+
+export async function getChronicles(): Promise<WeeklyChronicle[]> {
+  try {
+    const raw = await AsyncStorage.getItem(KEYS.CHRONICLES);
+    return raw ? (JSON.parse(raw) as WeeklyChronicle[]) : [];
+  } catch { return []; }
+}
+
+export async function saveChronicle(chronicle: WeeklyChronicle): Promise<WeeklyChronicle[]> {
+  const existing = await getChronicles();
+  const filtered = existing.filter(c => c.weekId !== chronicle.weekId);
+  const updated = [chronicle, ...filtered].slice(0, 52); // keep 1 year max
+  await AsyncStorage.setItem(KEYS.CHRONICLES, JSON.stringify(updated));
+  return updated;
+}
 
 // ---------- Entry CRUD ----------
 

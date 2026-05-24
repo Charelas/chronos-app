@@ -4,6 +4,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { Colors, Fonts } from '../../constants/theme';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useApp } from '../../context/AppContext';
+import { useRouter } from 'expo-router';
 import { formatDuration } from '../../utils/storage';
 
 type CategoryFilter = 'All' | 'Work' | 'Overtime' | 'Personal' | 'Meeting' | 'Education';
@@ -11,6 +12,7 @@ type RangeFilter = '7' | '30' | '90';
 
 export default function HistoryScreen() {
   const { entries, removeEntry } = useApp();
+  const router = useRouter();
   const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>('All');
   const [rangeFilter, setRangeFilter] = useState<RangeFilter>('30');
   const [showFilters, setShowFilters] = useState(false);
@@ -97,6 +99,18 @@ export default function HistoryScreen() {
         <Text style={styles.pageDesc}>
           A chronological audit of your temporal balance. {filteredEntries.length} entries found.
         </Text>
+
+        {/* Chronicle Banner */}
+        <TouchableOpacity style={styles.chronicleBanner} onPress={() => router.push('/chronicle')} activeOpacity={0.88}>
+          <View style={styles.chronicleLeft}>
+            <MaterialIcons name="auto-awesome" size={22} color={Colors.primary} />
+            <View>
+              <Text style={styles.chronicleTitle}>Weekly Chronicle</Text>
+              <Text style={styles.chronicleSub}>Your week distilled into an AI editorial</Text>
+            </View>
+          </View>
+          <MaterialIcons name="chevron-right" size={22} color={Colors.primary} />
+        </TouchableOpacity>
 
         {/* Filters */}
         <View style={styles.filterCard}>
@@ -224,4 +238,12 @@ const styles = StyleSheet.create({
   balanceUnit: { fontFamily: Fonts.body, fontSize: 10, marginTop: -2 },
   loadMore: { backgroundColor: Colors.surfaceContainerLowest, borderRadius: 12, paddingVertical: 16, alignItems: 'center', marginTop: 12, borderWidth: 1, borderColor: Colors.outlineVariant + '30' },
   loadMoreText: { fontFamily: Fonts.bodySemiBold, fontSize: 14, color: Colors.onSurface },
+  chronicleBanner: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    backgroundColor: Colors.primaryContainer, borderRadius: 16,
+    padding: 18, marginTop: 16, marginBottom: 4,
+  },
+  chronicleLeft: { flexDirection: 'row', alignItems: 'center', gap: 14, flex: 1 },
+  chronicleTitle: { fontFamily: Fonts.headline, fontSize: 15, color: Colors.onPrimaryContainer },
+  chronicleSub: { fontFamily: Fonts.body, fontSize: 12, color: Colors.onPrimaryContainer, opacity: 0.8, marginTop: 2 },
 });
