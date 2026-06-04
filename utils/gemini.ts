@@ -191,8 +191,8 @@ export async function getBalanceInsight(input: InsightInput): Promise<AIInsight>
         contents: [{ parts: [{ text: buildPrompt(input) }] }],
         generationConfig: {
           temperature: 0.7,
-          maxOutputTokens: 200,
-          // No responseMimeType — not supported by all models, causes 400
+          maxOutputTokens: 1024, // increased — gemini-2.5-flash uses thinking tokens that eat into output budget
+          thinkingConfig: { thinkingBudget: 0 }, // disable thinking for short JSON responses
         },
       }),
     });

@@ -83,7 +83,8 @@ export async function getWeeklyChronicle(
         contents: [{ parts: [{ text: buildPrompt(input) }] }],
         generationConfig: {
           temperature: 0.85,
-          maxOutputTokens: 300,
+          maxOutputTokens: 1024, // increased — thinking tokens eat into output budget on gemini-2.5-flash
+          thinkingConfig: { thinkingBudget: 0 }, // disable thinking for narrative output
         },
       }),
     });
