@@ -101,7 +101,7 @@ export default function HistoryScreen() {
         </Text>
 
         {/* Chronicle Banner */}
-        <TouchableOpacity style={styles.chronicleBanner} onPress={() => router.push('/chronicle')} activeOpacity={0.88}>
+        <TouchableOpacity style={styles.chronicleBanner} onPress={() => router.push('/chronicle' as any)} activeOpacity={0.88}>
           <View style={styles.chronicleLeft}>
             <MaterialIcons name="auto-awesome" size={22} color={Colors.primary} />
             <View>

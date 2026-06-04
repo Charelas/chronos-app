@@ -1,18 +1,25 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import {
-  View, Text, ScrollView, TouchableOpacity,
-  StyleSheet, ActivityIndicator, Share, Alert,
-} from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
-import { Colors, Fonts } from '../constants/theme';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { useApp } from '../context/AppContext';
 import { useRouter } from 'expo-router';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
-  WeeklyChronicle, getChronicles, saveChronicle,
+  ActivityIndicator,
+  Alert,
+  ScrollView,
+  Share,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { Colors, Fonts } from '../constants/theme';
+import { useApp } from '../context/AppContext';
+import { ChronicleInput, getWeeklyChronicle } from '../utils/gemini';
+import {
+  WeeklyChronicle, getChronicles,
   getWeekId, getWeekLabel,
+  saveChronicle,
 } from '../utils/storage';
-import { getWeeklyChronicle, ChronicleInput } from '../utils/gemini';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -220,7 +227,7 @@ export default function ChronicleScreen() {
           {/* Category breakdown pills */}
           {currentInput.categoryBreakdown.length > 0 && (
             <View style={styles.catRow}>
-              {currentInput.categoryBreakdown.slice(0, 4).map(c => (
+              {currentInput.categoryBreakdown.slice(0, 4).map((c: { name: string; pct: number }) => (
                 <View key={c.name} style={[styles.catPill, { backgroundColor: (CAT_COLORS[c.name] || Colors.primary) + '20' }]}>
                   <View style={[styles.catDot, { backgroundColor: CAT_COLORS[c.name] || Colors.primary }]} />
                   <Text style={[styles.catText, { color: CAT_COLORS[c.name] || Colors.primary }]}>
