@@ -20,6 +20,7 @@
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import type { ChronicleInput } from './storage';
 
 const GEMINI_API_KEY = process.env.EXPO_PUBLIC_GEMINI_API_KEY ?? '';
 
@@ -260,19 +261,8 @@ export async function invalidateInsightCache(): Promise<void> {
 // Weekly Chronicle
 // ══════════════════════════════════════════════════════════════════════════════
 
-export type ChronicleInput = {
-  weekId: string;
-  weekLabel: string;
-  totalHours: number;
-  activeDays: number;
-  totalEntries: number;
-  peakDay: string;
-  peakDayHours: number;
-  weeklyTarget: number;
-  finalBalance: number;
-  topCategory: string;
-  categoryBreakdown: { name: string; pct: number }[];
-};
+// ChronicleInput type is defined in utils/storage.ts and imported above.
+
 
 function buildChroniclePrompt(input: ChronicleInput): string {
   const { weekLabel, totalHours, activeDays, totalEntries, peakDay, peakDayHours,

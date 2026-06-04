@@ -75,6 +75,20 @@ export type WeeklyChronicle = {
   source: 'ai' | 'rule';
 };
 
+export type ChronicleInput = {
+  weekId: string;
+  weekLabel: string;
+  totalHours: number;
+  activeDays: number;
+  totalEntries: number;
+  peakDay: string;
+  peakDayHours: number;
+  weeklyTarget: number;
+  finalBalance: number;
+  topCategory: string;
+  categoryBreakdown: { name: string; pct: number }[];
+};
+
 export function getWeekId(date: Date = new Date()): string {
   const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
   const dayNum = d.getUTCDay() || 7;
