@@ -14,7 +14,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Colors, Fonts } from '../constants/theme';
 import { useApp } from '../context/AppContext';
-import { getWeeklyChronicle } from '../utils/gemini';
+import { getWeeklyChronicle } from '../utils/chronicle';
 import {
   ChronicleInput, WeeklyChronicle, getChronicles,
   getWeekId, getWeekLabel,
